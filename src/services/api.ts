@@ -109,7 +109,7 @@ class ApiService {
 
   // Autenticación
   async register(userData: RegisterData): Promise<ApiResponse> {
-    const response = await this.makeRequest<ApiResponse>("/users/register", {
+    const response = await this.makeRequest<ApiResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(userData),
     });
@@ -126,7 +126,7 @@ class ApiService {
   }
 
   async login(credentials: LoginCredentials): Promise<ApiResponse> {
-    const response = await this.makeRequest<ApiResponse>("/users/login", {
+    const response = await this.makeRequest<ApiResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
     });
