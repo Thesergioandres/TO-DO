@@ -6,31 +6,30 @@ const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
 
 function authenticateToken(req) {
-  console.log("[AUTH] Starting token authentication for /api/todo");
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
-    console.error("[AUTH ERROR] No token provided in authorization header");
+    console.error("[AUTH ERROR] No token provided");
     throw new Error("Access token required");
   }
 
   try {
-    console.log("[AUTH] Verifying JWT token...");
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log("[AUTH SUCCESS] Token verified for user:", decoded.userId);
     return decoded;
   } catch (error) {
-    console.error("[AUTH ERROR] JWT verification failed:", error.message);
+    console.error("[AUTH ERROR] Invalid token:", error.message);
     throw new Error("Invalid or expired token");
   }
 }
 
 module.exports = async (req, res) => {
-  console.log("[API TODO] Request received:", req.method, "to /api/todo");
-  console.log("[API TODO] Headers:", JSON.stringify(req.headers, null, 2));
-  console.log("[API TODO] Query params:", JSON.stringify(req.query, null, 2));
-  console.log("[API TODO] Body:", JSON.stringify(req.body, null, 2));
+  console.log(
+    "[API TODO]",
+    req.method,
+    "from:",
+    req.headers["x-forwarded-for"] || "localhost"
+  );
 
   // Configurar headers CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -43,25 +42,18 @@ module.exports = async (req, res) => {
 
   // Manejar CORS preflight
   if (req.method === "OPTIONS") {
-    console.log("[API TODO] CORS preflight request handled");
     res.status(200).end();
     return;
   }
 
   try {
-    console.log("[API TODO] Starting authentication...");
-    // Autenticar usuario
     const user = authenticateToken(req);
-    console.log("[API TODO] User authenticated, getting database...");
     const db = getInMemoryDatabase();
-    console.log("[API TODO] Database obtained, routing to handler...");
 
     switch (req.method) {
       case "GET":
-        console.log("[API TODO] Routing to GET handler");
         return handleGetTodos(req, res, db, user.userId);
       case "POST":
-        console.log("[API TODO] Routing to POST handler");
         return handleCreateTodo(req, res, db, user.userId);
       default:
         console.warn("[API TODO] Method not allowed:", req.method);
@@ -70,13 +62,10 @@ module.exports = async (req, res) => {
           .json({ success: false, message: "Method not allowed" });
     }
   } catch (error) {
-    console.error("[API TODO ERROR] Main handler error:", error.message);
-    console.error("[API TODO ERROR] Stack trace:", error.stack);
+    console.error("[API TODO ERROR]", error.message);
     if (error.message.includes("token")) {
-      console.error("[API TODO ERROR] Authentication error");
       return res.status(401).json({ success: false, message: error.message });
     }
-    console.error("[API TODO ERROR] Internal server error");
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
@@ -84,28 +73,18 @@ module.exports = async (req, res) => {
 };
 
 function handleGetTodos(req, res, db, userId) {
-  console.log("[GET TODO] Starting request for user:", userId);
   try {
     const { category, priority, search, status } = req.query;
-    console.log("[GET TODO] Query filters:", {
-      category,
-      priority,
-      search,
-      status,
-    });
-
     const filters = {
       category: category && category !== "all" ? category : null,
       priority: priority && priority !== "all" ? priority : null,
       search: search || null,
       status: status || "all",
     };
-    console.log("[GET TODO] Applied filters:", filters);
 
     const todos = db.getTodosByUserId(userId, filters);
-    console.log("[GET TODO] Found", todos.length, "todos for user");
+    console.log("[GET TODO] Found", todos.length, "todos for user:", userId);
 
-    // Formatear todos para frontend
     const formattedTodos = todos.map(todo => ({
       ...todo,
       tags: todo.tags
@@ -115,18 +94,15 @@ function handleGetTodos(req, res, db, userId) {
         : [],
       completed: Boolean(todo.completed),
     }));
-    console.log("[GET TODO] Successfully formatted todos");
 
     return res.status(200).json({ success: true, data: formattedTodos });
   } catch (error) {
-    console.error("[GET TODO ERROR] Error in handleGetTodos:", error.message);
-    console.error("[GET TODO ERROR] Stack trace:", error.stack);
+    console.error("[GET TODO ERROR]", error.message);
     throw error;
   }
 }
 
 function handleCreateTodo(req, res, db, userId) {
-  console.log("[CREATE TODO] Starting creation for user:", userId);
   try {
     const {
       title,
@@ -136,17 +112,9 @@ function handleCreateTodo(req, res, db, userId) {
       tags = [],
       due_date,
     } = req.body;
-    console.log("[CREATE TODO] Request body:", {
-      title,
-      description,
-      priority,
-      category,
-      tags,
-      due_date,
-    });
 
     if (!title?.trim()) {
-      console.warn("[CREATE TODO] Validation failed: Title is empty");
+      console.warn("[CREATE TODO] Title required for user:", userId);
       return res
         .status(400)
         .json({ success: false, message: "Title is required" });
@@ -154,7 +122,6 @@ function handleCreateTodo(req, res, db, userId) {
 
     const todoId = uuidv4();
     const now = new Date().toISOString();
-    console.log("[CREATE TODO] Generated todo ID:", todoId);
 
     const todoData = {
       id: todoId,
@@ -170,10 +137,9 @@ function handleCreateTodo(req, res, db, userId) {
       updated_at: now,
       deleted_at: null,
     };
-    console.log("[CREATE TODO] Todo data prepared:", todoData);
 
     db.createTodo(todoData);
-    console.log("[CREATE TODO] Todo saved to database successfully");
+    console.log("[CREATE TODO] Created todo:", todoId, "for user:", userId);
 
     const responseData = {
       ...todoData,
@@ -181,18 +147,13 @@ function handleCreateTodo(req, res, db, userId) {
       completed: false,
     };
 
-    console.log("[CREATE TODO] Todo created successfully with ID:", todoId);
     return res.status(201).json({
       success: true,
       data: responseData,
       message: "Todo created successfully",
     });
   } catch (error) {
-    console.error(
-      "[CREATE TODO ERROR] Error in handleCreateTodo:",
-      error.message
-    );
-    console.error("[CREATE TODO ERROR] Stack trace:", error.stack);
+    console.error("[CREATE TODO ERROR]", error.message);
     throw error;
   }
 }
