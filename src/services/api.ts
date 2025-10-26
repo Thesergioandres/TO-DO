@@ -1,9 +1,7 @@
 import type { Todo, TodoStats } from "../types/todo";
 
-// Para Vercel Serverless Functions, la URL base será la misma que el frontend
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
+// Forzar el uso de funciones serverless locales en Vercel
+const API_BASE_URL = "/api";
 
 export interface ApiResponse<T = unknown> {
   success?: boolean;
