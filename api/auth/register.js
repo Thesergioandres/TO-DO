@@ -21,13 +21,19 @@ if (!JWT_SECRET) {
 // Validador de contraseña segura
 function validatePassword(password) {
   if (password.length < 8) {
-    throw new Error("Password must be at least 8 characters long");
+    const error = new Error("Password must be at least 8 characters long");
+    error.name = "ValidationError";
+    error.statusCode = 400;
+    throw error;
   }
 
   if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-    throw new Error(
+    const error = new Error(
       "Password must contain at least one uppercase letter, one lowercase letter, and one number"
     );
+    error.name = "ValidationError";
+    error.statusCode = 400;
+    throw error;
   }
 }
 
@@ -82,7 +88,10 @@ module.exports = async (req, res) => {
 
     // Validar longitud del nombre
     if (name.trim().length < 2) {
-      throw new Error("Name must be at least 2 characters long");
+      const error = new Error("Name must be at least 2 characters long");
+      error.name = "ValidationError";
+      error.statusCode = 400;
+      throw error;
     }
 
     console.log("[AUTH REGISTER] Getting database connection...");
