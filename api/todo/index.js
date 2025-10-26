@@ -70,52 +70,72 @@ module.exports = async (req, res) => {
 async function handleGetTodos(req, res) {
   try {
     // Rate limiting
-    const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    const clientIP =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      "unknown";
     checkRateLimit(clientIP, 100, 15 * 60 * 1000); // 100 requests por 15 minutos
 
     const { userId } = req.user;
-    const { category, priority, search, status, page = 1, limit = 10 } = req.query;
-    
+    const {
+      category,
+      priority,
+      search,
+      status,
+      page = 1,
+      limit = 10,
+    } = req.query;
+
     console.log(`[TODO GET] Fetching todos for user: ${userId}`);
-    console.log(`[TODO GET] Filters: category=${category}, priority=${priority}, search=${search}, status=${status}`);
-    
+    console.log(
+      `[TODO GET] Filters: category=${category}, priority=${priority}, search=${search}, status=${status}`
+    );
+
     const db = getInMemoryDatabase();
-    
+
     // Obtener todos los TODOs del usuario
     let todos = db.getTodosByUserId(userId);
-    console.log(`[TODO GET] Found ${todos.length} total todos for user ${userId}`);
-    
+    console.log(
+      `[TODO GET] Found ${todos.length} total todos for user ${userId}`
+    );
+
     // Aplicar filtros
     if (category && category !== "all") {
       validateCategory(category);
-      todos = todos.filter(todo => todo.category === category);
+      todos = todos.filter((todo) => todo.category === category);
       console.log(`[TODO GET] After category filter: ${todos.length} todos`);
     }
-    
+
     if (priority && priority !== "all") {
       validatePriority(priority);
-      todos = todos.filter(todo => todo.priority === priority);
+      todos = todos.filter((todo) => todo.priority === priority);
       console.log(`[TODO GET] After priority filter: ${todos.length} todos`);
     }
-    
+
     if (status && status !== "all") {
-      const isCompleted = status === 'completed';
-      todos = todos.filter(todo => todo.completed === isCompleted);
+      const isCompleted = status === "completed";
+      todos = todos.filter((todo) => todo.completed === isCompleted);
       console.log(`[TODO GET] After status filter: ${todos.length} todos`);
     }
-    
+
     if (search) {
       const searchLower = search.toLowerCase();
-      todos = todos.filter(todo => 
-        todo.title.toLowerCase().includes(searchLower) ||
-        (todo.description && todo.description.toLowerCase().includes(searchLower))
+      todos = todos.filter(
+        (todo) =>
+          todo.title.toLowerCase().includes(searchLower) ||
+          (todo.description &&
+            todo.description.toLowerCase().includes(searchLower))
       );
       console.log(`[TODO GET] After search filter: ${todos.length} todos`);
     }
-    
+
     // Ordenar por fecha de creación (más recientes primero)
-    todos.sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
-    
+    todos.sort(
+      (a, b) =>
+        new Date(b.created_at || b.createdAt) -
+        new Date(a.created_at || a.createdAt)
+    );
+
     // Paginación
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + parseInt(limit);
@@ -138,13 +158,17 @@ async function handleGetTodos(req, res) {
         totalPages: Math.ceil(todos.length / limit),
         totalItems: todos.length,
         hasNext: endIndex < todos.length,
-        hasPrev: page > 1
-      }
+        hasPrev: page > 1,
+      },
     };
 
-    console.log(`[TODO GET] Returning ${formattedTodos.length} todos (page ${page})`);
-    return sendResponse(res, createSuccessResponse(responseData, 'Todos retrieved successfully'));
-
+    console.log(
+      `[TODO GET] Returning ${formattedTodos.length} todos (page ${page})`
+    );
+    return sendResponse(
+      res,
+      createSuccessResponse(responseData, "Todos retrieved successfully")
+    );
   } catch (error) {
     return handleApiError(error, req, res);
   }
@@ -153,7 +177,10 @@ async function handleGetTodos(req, res) {
 async function handleCreateTodo(req, res) {
   try {
     // Rate limiting
-    const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    const clientIP =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      "unknown";
     checkRateLimit(clientIP, 50, 15 * 60 * 1000); // 50 TODOs por 15 minutos
 
     const { userId } = req.user;
@@ -167,22 +194,29 @@ async function handleCreateTodo(req, res) {
     } = req.body;
 
     console.log(`[TODO CREATE] Creating todo for user: ${userId}`);
-    console.log(`[TODO CREATE] Data:`, { title, description, priority, category, tags, due_date });
+    console.log(`[TODO CREATE] Data:`, {
+      title,
+      description,
+      priority,
+      category,
+      tags,
+      due_date,
+    });
 
     // Validar campos requeridos
-    validateRequiredFields(req.body, ['title']);
+    validateRequiredFields(req.body, ["title"]);
 
     // Validaciones específicas
     if (title.trim().length < 1) {
-      throw new Error('Title cannot be empty');
+      throw new Error("Title cannot be empty");
     }
-    
+
     if (title.length > 200) {
-      throw new Error('Title must be less than 200 characters');
+      throw new Error("Title must be less than 200 characters");
     }
-    
+
     if (description && description.length > 1000) {
-      throw new Error('Description must be less than 1000 characters');
+      throw new Error("Description must be less than 1000 characters");
     }
 
     // Validar priority y category
@@ -191,16 +225,16 @@ async function handleCreateTodo(req, res) {
 
     // Validar tags
     if (!Array.isArray(tags)) {
-      throw new Error('Tags must be an array');
+      throw new Error("Tags must be an array");
     }
 
     if (tags.length > 10) {
-      throw new Error('Maximum 10 tags allowed');
+      throw new Error("Maximum 10 tags allowed");
     }
 
     for (const tag of tags) {
-      if (typeof tag !== 'string' || tag.length > 20) {
-        throw new Error('Each tag must be a string with maximum 20 characters');
+      if (typeof tag !== "string" || tag.length > 20) {
+        throw new Error("Each tag must be a string with maximum 20 characters");
       }
     }
 
@@ -210,7 +244,7 @@ async function handleCreateTodo(req, res) {
       const dueDateObj = new Date(due_date);
       const now = new Date();
       if (dueDateObj < now) {
-        throw new Error('Due date cannot be in the past');
+        throw new Error("Due date cannot be in the past");
       }
     }
 
@@ -242,8 +276,10 @@ async function handleCreateTodo(req, res) {
       completed: false,
     };
 
-    return sendResponse(res, createSuccessResponse(responseData, 'Todo created successfully', 201));
-
+    return sendResponse(
+      res,
+      createSuccessResponse(responseData, "Todo created successfully", 201)
+    );
   } catch (error) {
     return handleApiError(error, req, res);
   }
