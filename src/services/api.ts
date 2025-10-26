@@ -160,39 +160,42 @@ class ApiService {
   // Gestión de TODOs
   async getTodos(since?: string): Promise<Todo[]> {
     const params = since ? `?since=${encodeURIComponent(since)}` : "";
-    const response = await this.makeRequest<{ todos?: Todo[] } | Todo[]>(
-      `/todos${params}`
+    const response = await this.makeRequest<{ data?: Todo[] } | Todo[]>(
+      `/todo${params}`
     );
 
     if (Array.isArray(response)) {
       return response;
     }
 
-    return response.todos || [];
+    // Para la nueva API serverless, la respuesta viene en response.data
+    return (response as { data?: Todo[] }).data || [];
   }
 
   async createTodo(todo: Partial<Todo>): Promise<Todo> {
-    return this.makeRequest("/todos", {
+    const response = await this.makeRequest<{ data: Todo }>("/todo", {
       method: "POST",
       body: JSON.stringify(todo),
     });
+    return response.data;
   }
 
   async updateTodo(id: number, todo: Partial<Todo>): Promise<Todo> {
-    return this.makeRequest(`/todos/${id}`, {
+    const response = await this.makeRequest<{ data: Todo }>(`/todo/${id}`, {
       method: "PUT",
       body: JSON.stringify(todo),
     });
+    return response.data;
   }
 
   async deleteTodo(id: number): Promise<ApiResponse> {
-    return this.makeRequest(`/todos/${id}`, {
+    return this.makeRequest(`/todo/${id}`, {
       method: "DELETE",
     });
   }
 
   async getStats(): Promise<TodoStats> {
-    return this.makeRequest("/todos/stats");
+    return this.makeRequest("/todo/stats");
   }
 
   // Sincronización
@@ -200,7 +203,7 @@ class ApiService {
     todos: Todo[],
     lastSync?: string
   ): Promise<SyncUploadResponse> {
-    return this.makeRequest("/sync/upload", {
+    return this.makeRequest("/todo/sync/upload", {
       method: "POST",
       body: JSON.stringify({ todos, lastSync }),
     });
@@ -210,11 +213,11 @@ class ApiService {
     since?: string
   ): Promise<{ todos: Todo[]; timestamp: string }> {
     const params = since ? `?since=${encodeURIComponent(since)}` : "";
-    return this.makeRequest(`/sync/download${params}`);
+    return this.makeRequest(`/todo/sync/download${params}`);
   }
 
   async getSyncStatus(): Promise<SyncStatus> {
-    return this.makeRequest("/sync/status");
+    return this.makeRequest("/todo/sync/status");
   }
 
   async resolveConflict(
@@ -222,7 +225,7 @@ class ApiService {
     resolution: "use_server" | "use_client",
     todoData?: Partial<Todo>
   ): Promise<ApiResponse> {
-    return this.makeRequest("/sync/resolve-conflict", {
+    return this.makeRequest("/todo/sync/resolve-conflict", {
       method: "POST",
       body: JSON.stringify({
         client_id: clientId,
