@@ -6,7 +6,7 @@ const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
 
 function authenticateToken(req) {
-  console.log("[AUTH] Starting token authentication for /api/todo");
+  console.log("[AUTH] Starting token authentication for /api/todos");
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
@@ -26,68 +26,11 @@ function authenticateToken(req) {
   }
 }
 
-module.exports = async (req, res) => {
-  console.log("[API TODO] Request received:", req.method, "to /api/todo");
-  console.log("[API TODO] Headers:", JSON.stringify(req.headers, null, 2));
-  console.log("[API TODO] Query params:", JSON.stringify(req.query, null, 2));
-  console.log("[API TODO] Body:", JSON.stringify(req.body, null, 2));
-
-  // Configurar headers CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Content-Type", "application/json");
-
-  // Manejar CORS preflight
-  if (req.method === "OPTIONS") {
-    console.log("[API TODO] CORS preflight request handled");
-    res.status(200).end();
-    return;
-  }
-
-  try {
-    console.log("[API TODO] Starting authentication...");
-    // Autenticar usuario
-    const user = authenticateToken(req);
-    console.log("[API TODO] User authenticated, getting database...");
-    const db = getInMemoryDatabase();
-    console.log("[API TODO] Database obtained, routing to handler...");
-
-    switch (req.method) {
-      case "GET":
-        console.log("[API TODO] Routing to GET handler");
-        return handleGetTodos(req, res, db, user.userId);
-      case "POST":
-        console.log("[API TODO] Routing to POST handler");
-        return handleCreateTodo(req, res, db, user.userId);
-      default:
-        console.warn("[API TODO] Method not allowed:", req.method);
-        return res
-          .status(405)
-          .json({ success: false, message: "Method not allowed" });
-    }
-  } catch (error) {
-    console.error("[API TODO ERROR] Main handler error:", error.message);
-    console.error("[API TODO ERROR] Stack trace:", error.stack);
-    if (error.message.includes("token")) {
-      console.error("[API TODO ERROR] Authentication error");
-      return res.status(401).json({ success: false, message: error.message });
-    }
-    console.error("[API TODO ERROR] Internal server error");
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
-  }
-};
-
 function handleGetTodos(req, res, db, userId) {
-  console.log("[GET TODO] Starting request for user:", userId);
+  console.log("[GET TODOS] Starting request for user:", userId);
   try {
     const { category, priority, search, status } = req.query;
-    console.log("[GET TODO] Query filters:", {
+    console.log("[GET TODOS] Query filters:", {
       category,
       priority,
       search,
@@ -100,10 +43,10 @@ function handleGetTodos(req, res, db, userId) {
       search: search || null,
       status: status || "all",
     };
-    console.log("[GET TODO] Applied filters:", filters);
+    console.log("[GET TODOS] Applied filters:", filters);
 
     const todos = db.getTodosByUserId(userId, filters);
-    console.log("[GET TODO] Found", todos.length, "todos for user");
+    console.log("[GET TODOS] Found", todos.length, "todos for user");
 
     // Formatear todos para frontend
     const formattedTodos = todos.map(todo => ({
@@ -115,12 +58,12 @@ function handleGetTodos(req, res, db, userId) {
         : [],
       completed: Boolean(todo.completed),
     }));
-    console.log("[GET TODO] Successfully formatted todos");
+    console.log("[GET TODOS] Successfully formatted todos");
 
     return res.status(200).json({ success: true, data: formattedTodos });
   } catch (error) {
-    console.error("[GET TODO ERROR] Error in handleGetTodos:", error.message);
-    console.error("[GET TODO ERROR] Stack trace:", error.stack);
+    console.error("[GET TODOS ERROR] Error in handleGetTodos:", error.message);
+    console.error("[GET TODOS ERROR] Stack trace:", error.stack);
     throw error;
   }
 }
@@ -196,3 +139,60 @@ function handleCreateTodo(req, res, db, userId) {
     throw error;
   }
 }
+
+module.exports = async (req, res) => {
+  console.log("[API TODOS] Request received:", req.method, "to /api/todos");
+  console.log("[API TODOS] Headers:", JSON.stringify(req.headers, null, 2));
+  console.log("[API TODOS] Query params:", JSON.stringify(req.query, null, 2));
+  console.log("[API TODOS] Body:", JSON.stringify(req.body, null, 2));
+
+  // Configurar headers CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Content-Type", "application/json");
+
+  // Manejar CORS preflight
+  if (req.method === "OPTIONS") {
+    console.log("[API TODOS] CORS preflight request handled");
+    res.status(200).end();
+    return;
+  }
+
+  try {
+    console.log("[API TODOS] Starting authentication...");
+    // Autenticar usuario
+    const user = authenticateToken(req);
+    console.log("[API TODOS] User authenticated, getting database...");
+    const db = getInMemoryDatabase();
+    console.log("[API TODOS] Database obtained, routing to handler...");
+
+    switch (req.method) {
+      case "GET":
+        console.log("[API TODOS] Routing to GET handler");
+        return handleGetTodos(req, res, db, user.userId);
+      case "POST":
+        console.log("[API TODOS] Routing to POST handler");
+        return handleCreateTodo(req, res, db, user.userId);
+      default:
+        console.warn("[API TODOS] Method not allowed:", req.method);
+        return res
+          .status(405)
+          .json({ success: false, message: "Method not allowed" });
+    }
+  } catch (error) {
+    console.error("[API TODOS ERROR] Main handler error:", error.message);
+    console.error("[API TODOS ERROR] Stack trace:", error.stack);
+    if (error.message.includes("token")) {
+      console.error("[API TODOS ERROR] Authentication error");
+      return res.status(401).json({ success: false, message: error.message });
+    }
+    console.error("[API TODOS ERROR] Internal server error");
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};
