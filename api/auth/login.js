@@ -1,6 +1,15 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { getInMemoryDatabase } = require("../../lib/memoryDb");
+const {
+  createSuccessResponse,
+  createErrorResponse,
+  sendResponse,
+  handleApiError,
+  validateRequiredFields,
+  validateEmail,
+  checkRateLimit,
+} = require("../../lib/apiHelpers");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -34,21 +43,28 @@ module.exports = async (req, res) => {
 
   if (req.method !== "POST") {
     console.warn("[AUTH LOGIN] Method not allowed:", req.method);
-    return res
-      .status(405)
-      .json({ success: false, message: "Method not allowed" });
+    return sendResponse(
+      res,
+      createErrorResponse(`Method ${req.method} not allowed. Use POST.`, 405)
+    );
   }
 
   try {
+    // Rate limiting
+    const clientIP =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      "unknown";
+    checkRateLimit(clientIP, 20, 15 * 60 * 1000); // 20 intentos por 15 minutos
+
     const { email, password } = req.body;
     console.log("[AUTH LOGIN] Processing login for email:", email);
 
-    if (!email || !password) {
-      console.warn("[AUTH LOGIN] Validation failed: Missing email or password");
-      return res
-        .status(400)
-        .json({ success: false, message: "Email and password are required" });
-    }
+    // Validar campos requeridos
+    validateRequiredFields(req.body, ["email", "password"]);
+
+    // Validar formato de email
+    validateEmail(email);
 
     console.log("[AUTH LOGIN] Getting database connection...");
     const db = getInMemoryDatabase();
@@ -59,9 +75,10 @@ module.exports = async (req, res) => {
 
     if (!user) {
       console.warn("[AUTH LOGIN] User not found:", email);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+      return sendResponse(
+        res,
+        createErrorResponse("Invalid email or password", 401)
+      );
     }
     console.log("[AUTH LOGIN] User found, verifying password...");
 
@@ -69,9 +86,10 @@ module.exports = async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       console.warn("[AUTH LOGIN] Invalid password for user:", email);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+      return sendResponse(
+        res,
+        createErrorResponse("Invalid email or password", 401)
+      );
     }
     console.log("[AUTH LOGIN] Password verified successfully");
 
@@ -79,27 +97,29 @@ module.exports = async (req, res) => {
     console.log("[AUTH LOGIN] Generating JWT token...");
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: "7d",
+      issuer: "todo-app",
+      audience: "todo-app-users",
     });
     console.log("[AUTH LOGIN] JWT token generated successfully");
 
     const responseData = {
-      success: true,
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
       },
-      message: "Login successful",
     };
 
     console.log("[AUTH LOGIN] Login completed successfully for user:", user.id);
-    res.status(200).json(responseData);
+    return sendResponse(
+      res,
+      createSuccessResponse(responseData, "Login successful")
+    );
   } catch (error) {
     console.error("[AUTH LOGIN ERROR] Login failed:", error.message);
     console.error("[AUTH LOGIN ERROR] Stack trace:", error.stack);
-    res.status(500).json({ success: false, message: "Internal server error" });
+    return handleApiError(error, req, res);
   }
 };
