@@ -2,8 +2,11 @@ const { v4: uuidv4 } = require("uuid");
 const { getInMemoryDatabase } = require("../../lib/memoryDb");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
 
 function authenticateToken(req) {
   const authHeader = req.headers.authorization;
@@ -85,7 +88,7 @@ function handleGetTodos(req, res, db, userId) {
     const todos = db.getTodosByUserId(userId, filters);
     console.log("[GET TODO] Found", todos.length, "todos for user:", userId);
 
-    const formattedTodos = todos.map(todo => ({
+    const formattedTodos = todos.map((todo) => ({
       ...todo,
       tags: todo.tags
         ? typeof todo.tags === "string"
@@ -118,6 +121,51 @@ function handleCreateTodo(req, res, db, userId) {
       return res
         .status(400)
         .json({ success: false, message: "Title is required" });
+    }
+
+    // Validar priority
+    const validPriorities = ["low", "medium", "high", "urgent"];
+    if (!validPriorities.includes(priority)) {
+      console.warn("[CREATE TODO] Invalid priority:", priority);
+      return res.status(400).json({
+        success: false,
+        message: `Priority must be one of: ${validPriorities.join(", ")}`,
+      });
+    }
+
+    // Validar category
+    const validCategories = [
+      "personal",
+      "work",
+      "shopping",
+      "health",
+      "finance",
+      "education",
+    ];
+    if (!validCategories.includes(category)) {
+      console.warn("[CREATE TODO] Invalid category:", category);
+      return res.status(400).json({
+        success: false,
+        message: `Category must be one of: ${validCategories.join(", ")}`,
+      });
+    }
+
+    // Validar tags
+    if (!Array.isArray(tags)) {
+      console.warn("[CREATE TODO] Invalid tags format:", tags);
+      return res.status(400).json({
+        success: false,
+        message: "Tags must be an array",
+      });
+    }
+
+    // Validar due_date si se proporciona
+    if (due_date && isNaN(Date.parse(due_date))) {
+      console.warn("[CREATE TODO] Invalid due_date:", due_date);
+      return res.status(400).json({
+        success: false,
+        message: "due_date must be a valid ISO date string",
+      });
     }
 
     const todoId = uuidv4();

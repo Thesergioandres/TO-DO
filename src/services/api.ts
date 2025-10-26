@@ -194,6 +194,14 @@ class ApiService {
     });
   }
 
+  async toggleTodoComplete(id: number, completed: boolean): Promise<Todo> {
+    const response = await this.makeRequest<{ data: Todo }>(`/todo/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ completed }),
+    });
+    return response.data;
+  }
+
   async getStats(): Promise<TodoStats> {
     return this.makeRequest("/todo/stats");
   }
