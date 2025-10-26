@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { getDatabase } = require("../../lib/db");
+const { getInMemoryDatabase } = require("../../lib/memoryDb");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -36,10 +36,10 @@ module.exports = async (req, res) => {
         .json({ success: false, message: "Email and password are required" });
     }
 
-    const db = getDatabase();
+    const db = getInMemoryDatabase();
 
     // Buscar usuario
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    const user = db.getUserByEmail(email);
 
     if (!user) {
       return res

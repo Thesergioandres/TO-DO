@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
-const { getDatabase } = require("../../lib/db");
+const { getInMemoryDatabase } = require("../../lib/memoryDb");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -32,12 +32,10 @@ module.exports = async (req, res) => {
     const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Email, password and name are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Email, password and name are required",
+      });
     }
 
     // Validar email
@@ -50,20 +48,16 @@ module.exports = async (req, res) => {
 
     // Validar contraseña
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Password must be at least 6 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
     }
 
-    const db = getDatabase();
+    const db = getInMemoryDatabase();
 
     // Verificar si el usuario ya existe
-    const existingUser = db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .get(email);
+    const existingUser = db.getUserByEmail(email);
     if (existingUser) {
       return res
         .status(409)
@@ -76,13 +70,17 @@ module.exports = async (req, res) => {
 
     // Crear usuario
     const userId = uuidv4();
-    const stmt = db.prepare(`
-      INSERT INTO users (id, email, password, name, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
     const now = new Date().toISOString();
-    stmt.run(userId, email, hashedPassword, name, now, now);
+    const userData = {
+      id: userId,
+      email,
+      password: hashedPassword,
+      name,
+      created_at: now,
+      updated_at: now,
+    };
+
+    db.createUser(userData);
 
     // Crear token
     const token = jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: "7d" });
